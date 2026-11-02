@@ -44,10 +44,10 @@ REGLAGES = {
     # Base de données : fichier sentinelle.db à côté de manage.py (PC et PythonAnywhere).
     # Il est exclu de git (.gitignore : *.db) : un « git pull » ne l'écrase jamais.
     "SENTINELLE_BD": str(BASE_DIR / "sentinelle.db"),
-    # Adresse(s) du frontend autorisée(s) à appeler l'API (séparées par des virgules), ex. :
-    #   "https://sentinelle-la-colombe.vercel.app,http://localhost:3000"
-    # « * » = toutes : à remplacer par l'adresse Vercel dès qu'elle est connue.
-    "SENTINELLE_ORIGINES": "*",
+    # Adresse(s) du frontend autorisée(s) à appeler l'API (séparées par des virgules).
+    # En ligne : le site Vercel (+ localhost:3000 pour tester le frontend du PC contre l'API en ligne).
+    # Sur le PC : « * » (toutes), pour ouvrir le site depuis un téléphone du réseau local.
+    "SENTINELLE_ORIGINES": "https://jessna.vercel.app,http://localhost:3000" if EN_LIGNE else "*",
     # Site en HTTPS (PythonAnywhere) : cookies sécurisés. 0 sur le PC (http://localhost).
     "SENTINELLE_HTTPS": "1" if EN_LIGNE else "0",
     # Noms de domaine acceptés par Django.
