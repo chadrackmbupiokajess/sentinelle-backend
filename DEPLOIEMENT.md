@@ -18,7 +18,6 @@ Remplacez partout `VOTRE_NOM` par votre nom d'utilisateur PythonAnywhere.
 
    ```bash
    git clone https://github.com/VOTRE_COMPTE/Sentinelle-la-colombe-django.git
-   mkdir -p ~/donnees
    mkvirtualenv sentinelle --python=python3.12
    cd ~/Sentinelle-la-colombe-django
    pip install -r requirements.txt
@@ -125,7 +124,7 @@ Dépannage en ligne de commande : `python manage.py sentinelle lister`, `creer-e
    (ou sans Docker : `pip install -r requirements-vps.txt` puis
    `uvicorn sentinelle.asgi:application --host 0.0.0.0 --port 8000 --proxy-headers`).
 2. Dans `.env` : `SENTINELLE_WEBSOCKET=1`.
-3. Caddy devant pour le HTTPS. Copiez `sentinelle.db` depuis PythonAnywhere (`~/donnees`).
+3. Caddy devant pour le HTTPS. Copiez `sentinelle.db` depuis PythonAnywhere (à côté de `manage.py`).
 4. Sur Vercel : `NEXT_PUBLIC_API_URL` vers le VPS, **supprimez** `NEXT_PUBLIC_WEBSOCKET`, redéployez.
 
 Les écrans repassent aux WebSockets ; si un réseau les bloque, l'AJAX prend le relais en 8 secondes.

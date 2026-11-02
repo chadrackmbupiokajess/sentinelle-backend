@@ -41,8 +41,9 @@ EN_LIGNE = Path("/home/gescmlc").is_dir()
 REGLAGES = {
     # Clé secrète Django (ne la changez pas une fois en ligne : les sessions de l'admin seraient perdues).
     "DJANGO_SECRET_KEY": "jw_KuPkXtNC3gf39FfPz0AshFiCZxm4-pcS46XGws748usvFQ5d4K-zHTN-ekzo_YjQ",
-    # Base de données : en ligne, EN DEHORS du dossier git (un « git pull » ne l'écrase jamais).
-    "SENTINELLE_BD": "/home/gescmlc/donnees/sentinelle.db" if EN_LIGNE else str(BASE_DIR / "sentinelle.db"),
+    # Base de données : fichier sentinelle.db à côté de manage.py (PC et PythonAnywhere).
+    # Il est exclu de git (.gitignore : *.db) : un « git pull » ne l'écrase jamais.
+    "SENTINELLE_BD": str(BASE_DIR / "sentinelle.db"),
     # Adresse(s) du frontend autorisée(s) à appeler l'API (séparées par des virgules), ex. :
     #   "https://sentinelle-la-colombe.vercel.app,http://localhost:3000"
     # « * » = toutes : à remplacer par l'adresse Vercel dès qu'elle est connue.
@@ -145,10 +146,15 @@ TEMPLATES = [
 # Base de données : SQLite par défaut (fichier SENTINELLE_BD, hors du dépôt git).
 # Pour PostgreSQL plus tard (SaaS), remplacez simplement ce bloc.
 # --------------------------------------------------------------------------
+CHEMIN_BD = Path(env("SENTINELLE_BD", str(BASE_DIR / "sentinelle.db")))
+try:
+    CHEMIN_BD.parent.mkdir(parents=True, exist_ok=True)  # si un autre dossier est choisi
+except OSError:
+    pass
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": env("SENTINELLE_BD", str(BASE_DIR / "sentinelle.db")),
+        "NAME": str(CHEMIN_BD),
         "OPTIONS": {"timeout": 20},
     }
 }
