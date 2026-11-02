@@ -113,7 +113,7 @@ n'y a pas accès.
    `/plateforme` déconnecte tout son personnel et arrête ses bornes.
 
 Dépannage en ligne de commande : `python manage.py sentinelle lister`, `creer-etablissement "Nom" "Type"`,
-`creer-admin <identifiant> "<Nom>" <adresse>`, `reinitialiser <identifiant>`.
+`creer-admin <identifiant> "<Nom>" <adresse>`, `reinitialiser <identifiant> [adresse]`.
 
 ---
 

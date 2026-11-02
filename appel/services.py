@@ -279,7 +279,10 @@ def contacts_medicaux(etab: Etablissement) -> list[dict]:
     ]
 
 
-def _verifier_nouveau_compte(identifiant: str, nom: str, mot_de_passe: str) -> tuple[str, str]:
+def _verifier_nouveau_compte(
+    identifiant: str, nom: str, mot_de_passe: str, etab: Etablissement | None = None
+) -> tuple[str, str]:
+    """Format des champs ; si etab est donné, l'identifiant doit être libre DANS cet établissement."""
     identifiant = identifiant.strip().lower()
     nom = " ".join(nom.split())
     if not RE_IDENTIFIANT.match(identifiant):
@@ -291,8 +294,8 @@ def _verifier_nouveau_compte(identifiant: str, nom: str, mot_de_passe: str) -> t
     erreur = mot_de_passe_valide(mot_de_passe)
     if erreur:
         raise ErreurMetier(erreur)
-    if Compte.objects.filter(identifiant=identifiant).exists():
-        raise ErreurMetier("Cet identifiant est déjà utilisé.", 409)
+    if etab is not None and Compte.objects.filter(etablissement=etab, identifiant=identifiant).exists():
+        raise ErreurMetier("Cet identifiant est déjà utilisé dans cet établissement.", 409)
     return identifiant, nom
 
 
@@ -301,13 +304,14 @@ def inscrire(identifiant: str, nom: str, mot_de_passe: str, adresse: str) -> Com
     etab = etablissement_par_adresse(adresse)
     if not etab.active_le:
         raise ErreurMetier("Cet établissement n'est pas encore activé par son administrateur.", 409)
-    identifiant, nom = _verifier_nouveau_compte(identifiant, nom, mot_de_passe)
+    identifiant, nom = _verifier_nouveau_compte(identifiant, nom, mot_de_passe, etab)
     try:
-        return Compte.objects.create_user(
-            identifiant, mot_de_passe, etablissement=etab, nom=nom[:60], role="infirmier", statut="en_attente"
-        )
+        with transaction.atomic():
+            return Compte.objects.create_user(
+                identifiant, mot_de_passe, etablissement=etab, nom=nom[:60], role="infirmier", statut="en_attente"
+            )
     except IntegrityError:
-        raise ErreurMetier("Cet identifiant est déjà utilisé.", 409)
+        raise ErreurMetier("Cet identifiant est déjà utilisé dans cet établissement.", 409)
 
 
 def activer_etablissement(code: str, identifiant: str, nom: str, mot_de_passe: str) -> Compte:
@@ -320,24 +324,27 @@ def activer_etablissement(code: str, identifiant: str, nom: str, mot_de_passe: s
             active_le=maintenant(), code_activation=None, code_activation_expire=None
         ):
             raise ErreurMetier("Code invalide.", 404)
-        try:
-            compte = Compte.objects.create_user(
-                identifiant, mot_de_passe, etablissement=etab, nom=nom[:60], role="admin", statut="actif",
-                valide_par="Code d'activation",
-            )
-        except IntegrityError:
-            raise ErreurMetier("Cet identifiant est déjà utilisé.", 409)
+        compte = Compte.objects.create_user(  # établissement neuf : aucun compte, identifiant forcément libre
+            identifiant, mot_de_passe, etablissement=etab, nom=nom[:60], role="admin", statut="actif",
+            valide_par="Code d'activation",
+        )
     return Compte.objects.select_related("etablissement", "etablissement__type").get(id=compte.id)
 
 
 def authentifier(identifiant: str, mot_de_passe: str, adresse: str | None = None) -> Compte:
     """Connexion. Sur la page d'un établissement (adresse), seuls ses comptes sont acceptés."""
     identifiant = identifiant.strip().lower()
-    compte = (
-        Compte.objects.select_related("etablissement", "etablissement__type").filter(identifiant=identifiant).first()
-    )
-    if compte and adresse and (not compte.etablissement_id or compte.etablissement.slug != adresse.strip().lower()):
-        compte = None  # même message qu'un mot de passe faux : ne révèle pas les comptes des autres
+    candidats = Compte.objects.select_related("etablissement", "etablissement__type").filter(identifiant=identifiant)
+    if adresse:
+        # Page d'un établissement : seulement ses comptes (un même identifiant peut exister ailleurs).
+        candidats = candidats.filter(etablissement__slug=adresse.strip().lower())
+    elif len(candidats) > 1:
+        candidats = candidats.filter(etablissement__isnull=False)
+        if len(candidats) > 1:
+            raise ErreurMetier(
+                "Connectez-vous depuis l'adresse de votre établissement (ex. …/mon-etablissement).", 409
+            )
+    compte = candidats.first()
     if compte and compte.bloque_jusqua and compte.bloque_jusqua > maintenant():
         raise ErreurMetier("Trop d'essais. Réessayez dans quelques minutes.", 429)
     if not compte or not compte.check_password(mot_de_passe):

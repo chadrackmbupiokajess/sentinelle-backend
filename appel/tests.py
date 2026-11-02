@@ -114,6 +114,38 @@ class Activation(Base):
         self.assertEqual(self.api("post", "/api/auth/connexion", {"identifiant": "alice", "mot_de_passe": "secret123", "etablissement": b})[0], 401)
         self.assertEqual(self.api("post", "/api/auth/connexion", {"identifiant": "alice", "mot_de_passe": "secret123", "etablissement": a})[0], 200)
 
+    def test_meme_identifiant_dans_deux_etablissements(self):
+        admin_mbu, mbu = self.etablissement_actif("Mbu", "chef")
+        admin_fleur, fleur = self.etablissement_actif("Lafleur", "chef")  # même identifiant d'administrateur
+        self.soignant("mechack", mbu, admin_mbu)
+        self.soignant("mechack", fleur, admin_fleur)
+        self.assertEqual(Compte.objects.filter(identifiant="mechack").count(), 2)
+        # Deux fois dans le même établissement : refusé.
+        s, r = self.api("post", "/api/auth/inscription", {
+            "identifiant": "mechack", "nom": "Autre", "mot_de_passe": "secret123", "etablissement": mbu,
+        })
+        self.assertEqual(s, 409, r)
+        # Chaque page d'établissement connecte SON mechack.
+        for adresse, nom in ((mbu, "Mbu"), (fleur, "Lafleur")):
+            s, r = self.api("post", "/api/auth/connexion", {"identifiant": "mechack", "mot_de_passe": "secret123", "etablissement": adresse})
+            self.assertEqual((s, r["compte"]["etablissement"]["nom"]), (200, nom))
+        # Sans adresse : impossible de savoir lequel.
+        s, r = self.api("post", "/api/auth/connexion", {"identifiant": "mechack", "mot_de_passe": "secret123"})
+        self.assertEqual(s, 409, r)
+        # Les équipes restent séparées.
+        s, equipe = self.api("get", "/api/admin/comptes", jeton=admin_mbu)
+        self.assertEqual(sorted(c["identifiant"] for c in equipe), ["chef", "mechack"])
+
+    def test_proprietaire_et_admin_django(self):
+        admin_a, a = self.etablissement_actif("Mbu", "proprio")  # même identifiant que le propriétaire
+        self.assertEqual(self.api("post", "/api/auth/connexion", {"identifiant": "proprio", "mot_de_passe": "secret123", "etablissement": a})[0], 200)
+        self.assertEqual(self.api("post", "/api/plateforme/connexion", {"identifiant": "proprio", "mot_de_passe": "Proprio123"})[0], 200)
+        self.assertEqual(self.api("post", "/api/plateforme/connexion", {"identifiant": "proprio", "mot_de_passe": "secret123"})[0], 401)
+        self.assertTrue(self.client.login(username="proprio", password="Proprio123"))   # admin Django
+        self.assertFalse(self.client.login(username="proprio", password="secret123"))  # pas le compte d'établissement
+        with self.assertRaises(Exception):
+            Compte.objects.create_superuser("proprio", "Autre1234")  # unique entre propriétaires
+
     def test_mot_de_passe_faible(self):
         e = self.nouvel_etablissement("Jessna Hôpital")
         s, r = self.api("post", "/api/activation", {"code": e["code_activation"], "identifiant": "chadrack", "nom": "C", "mot_de_passe": "abcdefgh"})

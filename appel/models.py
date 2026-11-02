@@ -59,6 +59,11 @@ class Etablissement(models.Model):
 # Comptes soignants
 # --------------------------------------------------------------------------
 class GestionnaireComptes(BaseUserManager):
+    def get_by_natural_key(self, identifiant):
+        """Admin Django et createsuperuser : seulement les comptes de la plateforme (sans établissement).
+        Un même identifiant peut exister dans plusieurs établissements."""
+        return self.get(identifiant=identifiant.strip().lower(), etablissement__isnull=True)
+
     def create_user(self, identifiant, password=None, **champs):
         compte = self.model(identifiant=identifiant.strip().lower(), **champs)
         compte.set_password(password)
@@ -69,6 +74,8 @@ class GestionnaireComptes(BaseUserManager):
         """Propriétaire de la plateforme : accès à /admin/ du backend (admin Django) et à /plateforme du site, sans établissement."""
         champs.setdefault("nom", identifiant)
         champs.update(is_staff=True, is_superuser=True, role="admin", statut="actif")
+        if self.filter(identifiant=identifiant.strip().lower(), etablissement__isnull=True).exists():
+            raise ValueError(f"L'identifiant « {identifiant} » est déjà pris par un compte de la plateforme.")
         return self.create_user(identifiant, password, **champs)
 
 
@@ -84,7 +91,8 @@ class Compte(AbstractBaseUser, PermissionsMixin):
     etablissement = models.ForeignKey(
         Etablissement, null=True, blank=True, on_delete=models.CASCADE, related_name="comptes"
     )
-    identifiant = models.CharField(max_length=30, unique=True)
+    # Unique DANS un établissement : « mechack » peut exister à la fois chez Mbu et chez Lafleur.
+    identifiant = models.CharField(max_length=30, db_index=True)
     nom = models.CharField(max_length=60)
     role = models.CharField(max_length=10, choices=ROLES, default="infirmier")
     statut = models.CharField(max_length=12, choices=STATUTS, default="en_attente")
@@ -103,6 +111,13 @@ class Compte(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = "compte"
         indexes = [models.Index(fields=["etablissement", "statut"])]
+        constraints = [
+            models.UniqueConstraint(fields=["etablissement", "identifiant"], name="identifiant_unique_par_etablissement"),
+            # Comptes de la plateforme (propriétaires, sans établissement) : identifiant unique entre eux.
+            models.UniqueConstraint(
+                fields=["identifiant"], condition=models.Q(etablissement__isnull=True), name="identifiant_unique_plateforme"
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.nom} ({self.identifiant})"

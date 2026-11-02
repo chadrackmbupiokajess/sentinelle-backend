@@ -4,7 +4,7 @@ Dépannage en ligne de commande (sur le serveur) :
     python manage.py sentinelle lister
     python manage.py sentinelle creer-etablissement "Clinique La Colombe" ["Restaurant"]
     python manage.py sentinelle creer-admin <identifiant> "<Nom complet>" <adresse-etablissement>
-    python manage.py sentinelle reinitialiser <identifiant>
+    python manage.py sentinelle reinitialiser <identifiant> [adresse-etablissement]
 
 Utile si l'unique administrateur d'un établissement a oublié son mot de passe.
 """
@@ -57,15 +57,21 @@ class Command(BaseCommand):
         if not etab:
             raise CommandError("Adresse d'établissement inconnue.")
         mot_de_passe = getpass.getpass("Mot de passe : ")
-        identifiant, nom = services._verifier_nouveau_compte(identifiant, nom, mot_de_passe)
+        identifiant, nom = services._verifier_nouveau_compte(identifiant, nom, mot_de_passe, etab)
         Compte.objects.create_user(identifiant, mot_de_passe, etablissement=etab, nom=nom, role="admin", statut="actif")
         if not etab.active_le:
             etab.active_le, etab.code_activation, etab.code_activation_expire = maintenant(), None, None
             etab.save(update_fields=["active_le", "code_activation", "code_activation_expire"])
         self.stdout.write(self.style.SUCCESS(f"Administrateur {identifiant} créé dans {etab.nom}."))
 
-    def reinitialiser(self, identifiant):
-        compte = Compte.objects.filter(identifiant=identifiant.strip().lower()).first()
+    def reinitialiser(self, identifiant, adresse=None):
+        comptes = Compte.objects.filter(identifiant=identifiant.strip().lower())
+        if adresse:
+            comptes = comptes.filter(etablissement__slug=adresse.strip().lower())
+        if len(comptes) > 1:
+            lieux = ", ".join(c.etablissement.slug if c.etablissement_id else "(plateforme)" for c in comptes)
+            raise CommandError(f"Identifiant présent dans plusieurs établissements ({lieux}) : précisez l'adresse.")
+        compte = comptes.first()
         if not compte:
             raise CommandError("Compte introuvable.")
         provisoire = mot_de_passe_temporaire()

@@ -161,6 +161,9 @@ DATABASES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "appel.Compte"
+AUTHENTICATION_BACKENDS = ["appel.backends.ComptesPlateforme"]
+# L'identifiant n'est unique que par établissement (contraintes du modèle Compte) : voulu.
+SILENCED_SYSTEM_CHECKS = ["auth.W004"]
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.ScryptPasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",
