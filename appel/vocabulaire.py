@@ -40,7 +40,7 @@ TYPES_PAR_DEFAUT: dict[str, dict[str, str]] = {
     "Hôpital": {},
     "Centre médical": {
         "lieu": "Salle", "lieux": "Salles", "le_lieu": "la salle",
-        "place": "Poste", "places": "Postes", "le_place": "le poste",
+        # place : « Lit » (valeur par défaut), comme à l'hôpital.
         "groupes_initiaux": "Consultations, Soins", "places_par_defaut": "3",
     },
     "Restaurant": {
