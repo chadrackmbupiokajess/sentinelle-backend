@@ -22,8 +22,6 @@ Remplacez partout `VOTRE_NOM` par votre nom d'utilisateur PythonAnywhere.
    mkvirtualenv sentinelle --python=python3.12
    cd ~/Sentinelle-la-colombe-django
    pip install -r requirements.txt
-   echo "SENTINELLE_BD=/home/VOTRE_NOM/donnees/sentinelle.db" > .env
-   echo "SENTINELLE_HTTPS=1" >> .env
    python manage.py migrate
    python manage.py collectstatic --noinput
    python manage.py check

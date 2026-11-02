@@ -1,8 +1,9 @@
 """
 Réglages Django de Sentinelle.
 
-Tout se règle par variables d'environnement, ou par le fichier .env placé à côté
-de manage.py (jamais envoyé sur git). Voir .env.example.
+Les valeurs sont écrites directement ci-dessous (bloc « RÉGLAGES ») : le dépôt GitHub est PRIVÉ.
+Une variable d'environnement, ou un fichier .env à côté de manage.py, reste prioritaire si besoin.
+Le chemin de la base et le HTTPS s'adaptent seuls : PythonAnywhere ou PC local.
 """
 
 from __future__ import annotations
@@ -31,9 +32,41 @@ def _charger_env(chemin: Path) -> None:
 
 _charger_env(BASE_DIR / ".env")
 
+# ==========================================================================
+# RÉGLAGES (dépôt privé) — à modifier ici
+# ==========================================================================
+# Sur PythonAnywhere (compte gescmlc) ou sur le PC ?
+EN_LIGNE = Path("/home/gescmlc").is_dir()
+
+REGLAGES = {
+    # Clé secrète Django (ne la changez pas une fois en ligne : les sessions de l'admin seraient perdues).
+    "DJANGO_SECRET_KEY": "jw_KuPkXtNC3gf39FfPz0AshFiCZxm4-pcS46XGws748usvFQ5d4K-zHTN-ekzo_YjQ",
+    # Base de données : en ligne, EN DEHORS du dossier git (un « git pull » ne l'écrase jamais).
+    "SENTINELLE_BD": "/home/gescmlc/donnees/sentinelle.db" if EN_LIGNE else str(BASE_DIR / "sentinelle.db"),
+    # Adresse(s) du frontend autorisée(s) à appeler l'API (séparées par des virgules), ex. :
+    #   "https://sentinelle-la-colombe.vercel.app,http://localhost:3000"
+    # « * » = toutes : à remplacer par l'adresse Vercel dès qu'elle est connue.
+    "SENTINELLE_ORIGINES": "*",
+    # Site en HTTPS (PythonAnywhere) : cookies sécurisés. 0 sur le PC (http://localhost).
+    "SENTINELLE_HTTPS": "1" if EN_LIGNE else "0",
+    # Noms de domaine acceptés par Django.
+    "SENTINELLE_HOTES": "gescmlc.pythonanywhere.com" if EN_LIGNE else "*",
+    # Notifications push (clés VAPID, générées pour Sentinelle).
+    "SENTINELLE_VAPID_PUBLIC_KEY": "BCYEeHOZbpwGDZf022weipYC_j4XI1YLLxMqFsMERLot4KhF69226aIFUMsl-8Z5qQv_hIT9fr8jjVeqso5xIYc",
+    "SENTINELLE_VAPID_PRIVATE_KEY": "lEIUTgzZCkr2ETMEvCU_M7rxMEkSljhtzVbAOqbBh7s",
+    # Contact exigé par les services de notification : mettez votre adresse e-mail.
+    "SENTINELLE_VAPID_SUBJECT": "mailto:vous@exemple.com",
+    # --- VPS uniquement -------------------------------------------------------
+    # WebSockets (Django Channels, serveur uvicorn) : "1" sur le VPS.
+    "SENTINELLE_WEBSOCKET": "0",
+    # Plusieurs processus uvicorn : Redis obligatoire, ex. "redis://localhost:6379/0".
+    "SENTINELLE_REDIS_URL": "",
+}
+
 
 def env(nom: str, defaut: str = "") -> str:
-    return os.environ.get(nom, defaut).strip()
+    """Variable d'environnement (ou .env), sinon valeur du bloc RÉGLAGES, sinon la valeur par défaut."""
+    return os.environ.get(nom, REGLAGES.get(nom, defaut)).strip()
 
 
 def env_bool(nom: str, defaut: bool = False) -> bool:
@@ -45,7 +78,7 @@ def env_liste(nom: str, defaut: str) -> list[str]:
 
 
 def _cle_secrete() -> str:
-    """DJANGO_SECRET_KEY, sinon une clé générée une fois et conservée dans .cle_secrete."""
+    """DJANGO_SECRET_KEY (bloc RÉGLAGES), sinon une clé générée une fois et conservée dans .cle_secrete."""
     cle = env("DJANGO_SECRET_KEY")
     if cle:
         return cle
