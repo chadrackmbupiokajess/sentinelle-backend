@@ -74,7 +74,7 @@ def donnees_urgence(message_id: int, expediteur_nom: str, expediteur_role: str, 
         "type": "urgence",
         "tag": f"urgence-privee-{message_id}",
         "titre": f"🚨 Urgence — {expediteur_nom} ({role})",
-        "corps": "Vous êtes demandé(e). Ouvrez Sentinelle puis appuyez sur « J'arrive ».",
+        "corps": "Vous êtes demandé(e). Ouvrez Jessna puis appuyez sur « J'arrive ».",
         "url": "/infirmier",
         "message_id": message_id,
     }

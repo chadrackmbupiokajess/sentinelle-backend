@@ -2,8 +2,8 @@ from django.contrib import admin
 from django.contrib.staticfiles.views import serve as servir_statique
 from django.urls import include, path
 
-admin.site.site_header = "Sentinelle — gestion de la plateforme"
-admin.site.site_title = "Sentinelle"
+admin.site.site_header = "Jessna — gestion de la plateforme"
+admin.site.site_title = "Jessna"
 admin.site.index_title = "Établissements et comptes"
 admin.site.site_url = None  # pas de lien « Voir le site » : le site est sur une autre adresse (Vercel)
 
