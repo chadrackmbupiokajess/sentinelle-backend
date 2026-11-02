@@ -1,0 +1,6 @@
+# VPS uniquement : WebSockets (Django Channels) servis par uvicorn
+-r requirements.txt
+channels>=4.2
+uvicorn[standard]>=0.30
+# Plusieurs processus uvicorn ? Décommentez et réglez SENTINELLE_REDIS_URL :
+# channels-redis>=4.2

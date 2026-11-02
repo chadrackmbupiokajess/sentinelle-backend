@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Réglages et secrets
+.env
+.env.*
+!.env.example
+.cle_secrete
+
+# Base de données (hors du dépôt)
+*.db
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Fichiers statiques collectés (python manage.py collectstatic)
+static/
+
+# Éditeurs / système
+.vscode/
+.idea/
+.DS_Store
+*.log

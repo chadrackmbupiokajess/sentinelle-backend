@@ -1,0 +1,5 @@
+# Sentinelle — backend Django (PythonAnywhere et VPS)
+Django>=5.2,<6.0
+djangorestframework>=3.16
+django-cors-headers>=4.4
+pywebpush>=2.0,<3
