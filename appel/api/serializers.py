@@ -89,6 +89,14 @@ class NomEtablissement(serializers.Serializer):
     nom = serializers.CharField(min_length=2, max_length=80)
 
 
+class Logo(serializers.Serializer):
+    """Images en base64 (préparées par le navigateur : logo, icône carrée, icône « maskable »)."""
+
+    image = serializers.CharField(max_length=1_500_000)
+    icone = serializers.CharField(max_length=1_500_000)
+    icone_masquable = serializers.CharField(max_length=1_500_000)
+
+
 def valider(classe, donnees) -> dict:
     s = classe(data=donnees)
     s.is_valid(raise_exception=True)

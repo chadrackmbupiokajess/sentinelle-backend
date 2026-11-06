@@ -146,6 +146,52 @@ class Activation(Base):
         with self.assertRaises(Exception):
             Compte.objects.create_superuser("proprio", "Autre1234")  # unique entre propriétaires
 
+    def test_logo(self):
+        import base64
+        png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+        b64 = lambda b: "data:image/png;base64," + base64.b64encode(b).decode()
+        admin, mbu = self.etablissement_actif("Mbu", "chef")
+        jeton_soignant, _ = self.soignant("mechack", mbu, admin)
+        s, e = self.api("get", f"/api/etablissements/{mbu}")
+        self.assertEqual((e["logo"], e["icone"]), (None, None))
+        self.assertEqual(self.c.get(f"/api/etablissements/{mbu}/logo").status_code, 404)
+        # Réservé à l'administrateur
+        corps = {"image": b64(png), "icone": b64(png), "icone_masquable": b64(png)}
+        self.assertEqual(self.api("put", "/api/admin/etablissement/logo", corps, jeton_soignant)[0], 403)
+        # Formats refusés : SVG (peut contenir du code), texte déguisé
+        for faux in (b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>", b"bonjour"):
+            s, r = self.api("put", "/api/admin/etablissement/logo", {**corps, "image": b64(faux)}, admin)
+            self.assertEqual(s, 415, r)
+        s, r = self.api("put", "/api/admin/etablissement/logo", {**corps, "image": "pas du base64 !"}, admin)
+        self.assertEqual(s, 400, r)
+        s, r = self.api("put", "/api/admin/etablissement/logo", {**corps, "image": b64(b"\x89PNG\r\n\x1a\n" + b"0" * (1024 * 1024 + 1))}, admin)
+        self.assertEqual(s, 413, r)
+        # JPEG accepté pour le logo
+        jpeg = b"\xff\xd8\xff\xe0" + b"\x00" * 32
+        s, e = self.api("put", "/api/admin/etablissement/logo", {**corps, "image": b64(jpeg)}, admin)
+        self.assertEqual(s, 200, e)
+        self.assertEqual(e["logo"], f"/api/etablissements/{mbu}/logo?v=1")
+        r = self.c.get(e["logo"])
+        self.assertEqual((r.status_code, r["Content-Type"], r.content), (200, "image/jpeg", jpeg))
+        self.assertIn("immutable", r["Cache-Control"])
+        self.assertEqual(r["Cross-Origin-Resource-Policy"], "cross-origin")
+        r = self.c.get(f"/api/etablissements/{mbu}/icone-masquable?v=1")
+        self.assertEqual((r.status_code, r["Content-Type"]), (200, "image/png"))
+        # Visible partout : page publique, session du personnel, liste du propriétaire
+        self.assertEqual(self.api("get", f"/api/etablissements/{mbu}")[1]["icone"], f"/api/etablissements/{mbu}/icone?v=1")
+        self.assertEqual(self.api("get", "/api/auth/moi", jeton=jeton_soignant)[1]["etablissement"]["logo"], e["logo"])
+        liste = self.api("get", "/api/plateforme/etablissements", jeton=self.proprio)[1]
+        liste = liste["etablissements"] if isinstance(liste, dict) else liste
+        self.assertEqual(next(x for x in liste if x["slug"] == mbu)["logo"], e["logo"])
+        # Nouveau logo → nouvelle adresse ; retrait → plus de logo, adresse jamais réutilisée
+        self.assertEqual(self.api("put", "/api/admin/etablissement/logo", corps, admin)[1]["logo"], f"/api/etablissements/{mbu}/logo?v=2")
+        s, e = self.api("delete", "/api/admin/etablissement/logo", None, admin)
+        self.assertEqual((s, e["logo"]), (200, None))
+        self.assertEqual(self.c.get(f"/api/etablissements/{mbu}/logo?v=2").status_code, 404)
+        self.assertEqual(self.api("put", "/api/admin/etablissement/logo", corps, admin)[1]["logo"], f"/api/etablissements/{mbu}/logo?v=4")
+        # Les autres réponses de l'API restent sans cache
+        self.assertEqual(self.c.get(f"/api/etablissements/{mbu}")["Cache-Control"], "no-store")
+
     def test_mot_de_passe_faible(self):
         e = self.nouvel_etablissement("Jessna Hôpital")
         s, r = self.api("post", "/api/activation", {"code": e["code_activation"], "identifiant": "chadrack", "nom": "C", "mot_de_passe": "abcdefgh"})

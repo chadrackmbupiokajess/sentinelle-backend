@@ -40,6 +40,10 @@ class Etablissement(models.Model):
     active_le = models.DateTimeField(null=True, blank=True)
     actif = models.BooleanField(default=True)
     cree_le = models.DateTimeField(default=maintenant)
+    # Logo choisi par l'administrateur (images dans LogoEtablissement). La version change à chaque
+    # nouveau logo : l'adresse de l'image change aussi, les navigateurs peuvent la garder en cache.
+    a_logo = models.BooleanField(default=False)
+    logo_version = models.PositiveIntegerField(default=0)
 
     class Meta:
         verbose_name = "établissement"
@@ -53,6 +57,22 @@ class Etablissement(models.Model):
         from .vocabulaire import complet
 
         return complet(self.type.vocabulaire if self.type_id else None)
+
+
+class LogoEtablissement(models.Model):
+    """Images du logo, à part pour ne pas les charger à chaque requête.
+    Préparées par le navigateur de l'administrateur : le logo (512 px max), l'icône de l'application
+    installée (carré 512 px) et sa version « maskable » (Android découpe en rond ou en goutte)."""
+
+    etablissement = models.OneToOneField(Etablissement, primary_key=True, on_delete=models.CASCADE, related_name="images_logo")
+    image = models.BinaryField()
+    type = models.CharField(max_length=20)
+    icone = models.BinaryField()
+    icone_masquable = models.BinaryField()
+    modifie_le = models.DateTimeField(default=maintenant)
+
+    class Meta:
+        verbose_name = "logo d'établissement"
 
 
 # --------------------------------------------------------------------------

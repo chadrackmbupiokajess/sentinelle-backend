@@ -8,6 +8,9 @@ urlpatterns = [
     path("config", v.config),
     # Établissements : page publique et activation (code à usage unique)
     path("etablissements/<str:adresse>", v.etablissement_public),
+    path("etablissements/<str:adresse>/logo", v.image_logo("logo")),
+    path("etablissements/<str:adresse>/icone", v.image_logo("icone")),
+    path("etablissements/<str:adresse>/icone-masquable", v.image_logo("icone-masquable")),
     path("activation/verifier", v.verifier_activation),
     path("activation", v.activer),
     # Authentification
@@ -36,6 +39,7 @@ urlpatterns = [
     path("chambres/<str:chambre_id>/lits/<int:lit>/sortie", v.sortie),
     # Administration
     path("admin/etablissement", v.admin_etablissement),
+    path("admin/etablissement/logo", v.admin_logo),
     path("admin/comptes", v.admin_comptes),
     path("admin/comptes/<int:compte_id>/statut", v.admin_statut),
     path("admin/comptes/<int:compte_id>/role", v.admin_role),

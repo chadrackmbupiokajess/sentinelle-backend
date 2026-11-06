@@ -23,7 +23,7 @@ class EtablissementAdmin(admin.ModelAdmin):
     list_display = ("nom", "type", "slug", "actif", "nb_comptes", "nb_chambres", "cree_le")
     list_filter = ("actif", "type")
     search_fields = ("nom", "slug")
-    readonly_fields = ("slug", "code_activation", "code_activation_expire", "active_le", "cree_le")
+    readonly_fields = ("slug", "code_activation", "code_activation_expire", "active_le", "cree_le", "a_logo", "logo_version")
     inlines = [ChambreEnLigne]
 
     def get_queryset(self, requete):

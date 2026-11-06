@@ -26,6 +26,7 @@ from .models import (
     Chambre,
     Compte,
     Etablissement,
+    LogoEtablissement,
     Message,
     MessagePrive,
     Sejour,
@@ -87,7 +88,8 @@ def compte_public(c: Compte) -> dict:
 
 
 def etablissement_public(e: Etablissement) -> dict:
-    """Ce que voient les écrans : nom, adresse, type et vocabulaire."""
+    """Ce que voient les écrans : nom, adresse, type, vocabulaire et logo."""
+    base = f"/api/etablissements/{e.slug}"
     return {
         "id": e.id,
         "nom": e.nom,
@@ -95,6 +97,9 @@ def etablissement_public(e: Etablissement) -> dict:
         "type": e.type.nom,
         "vocabulaire": e.vocabulaire,
         "actif": e.actif,
+        # Adresses relatives au backend ; « ?v= » change à chaque nouveau logo.
+        "logo": f"{base}/logo?v={e.logo_version}" if e.a_logo else None,
+        "icone": f"{base}/icone?v={e.logo_version}" if e.a_logo else None,
     }
 
 
@@ -246,6 +251,60 @@ def etablissement_par_adresse(slug: str) -> Etablissement:
     if not etab or not etab.actif:
         raise ErreurMetier("Établissement introuvable.", 404)
     return etab
+
+
+# ----------------------------------------------------------------- logo
+TAILLE_MAX_LOGO = 1024 * 1024  # 1 Mo par image (le navigateur les réduit à 512 px avant l'envoi)
+SIGNATURES_IMAGES = {
+    "image/png": lambda b: b.startswith(b"\x89PNG\r\n\x1a\n"),
+    "image/jpeg": lambda b: b.startswith(b"\xff\xd8\xff"),
+    "image/webp": lambda b: b[:4] == b"RIFF" and b[8:12] == b"WEBP",
+}
+
+
+def _verifier_image(donnees: bytes, types: tuple[str, ...], quoi: str) -> str:
+    """Type réel de l'image (d'après son contenu, pas son nom). SVG refusé : il peut contenir du code."""
+    if not donnees:
+        raise ErreurMetier(f"{quoi} : image vide.")
+    if len(donnees) > TAILLE_MAX_LOGO:
+        raise ErreurMetier(f"{quoi} : image trop lourde (1 Mo au maximum).", 413)
+    for t in types:
+        if SIGNATURES_IMAGES[t](donnees):
+            return t
+    raise ErreurMetier(f"{quoi} : format non pris en charge (PNG, JPEG ou WebP).", 415)
+
+
+def changer_logo(etab: Etablissement, image: bytes, icone: bytes, icone_masquable: bytes) -> dict:
+    type_image = _verifier_image(image, ("image/png", "image/jpeg", "image/webp"), "Logo")
+    _verifier_image(icone, ("image/png",), "Icône")
+    _verifier_image(icone_masquable, ("image/png",), "Icône")
+    with transaction.atomic():
+        LogoEtablissement.objects.update_or_create(
+            etablissement=etab,
+            defaults={"image": image, "type": type_image, "icone": icone, "icone_masquable": icone_masquable, "modifie_le": maintenant()},
+        )
+        etab.a_logo, etab.logo_version = True, etab.logo_version + 1
+        etab.save(update_fields=["a_logo", "logo_version"])
+    return etablissement_public(etab)
+
+
+def retirer_logo(etab: Etablissement) -> dict:
+    with transaction.atomic():
+        LogoEtablissement.objects.filter(etablissement=etab).delete()
+        etab.a_logo, etab.logo_version = False, etab.logo_version + 1  # jamais deux fois la même adresse
+        etab.save(update_fields=["a_logo", "logo_version"])
+    return etablissement_public(etab)
+
+
+def image_logo(adresse: str, quelle: str) -> tuple[bytes, str] | None:
+    """quelle : « logo », « icone » ou « icone-masquable ». None si l'établissement n'a pas de logo."""
+    etab = etablissement_par_adresse(adresse)
+    logo = LogoEtablissement.objects.filter(etablissement=etab).first() if etab.a_logo else None
+    if not logo:
+        return None
+    if quelle == "logo":
+        return bytes(logo.image), logo.type
+    return bytes(logo.icone if quelle == "icone" else logo.icone_masquable), "image/png"
 
 
 def renommer_etablissement(etab: Etablissement, nom: str) -> dict:

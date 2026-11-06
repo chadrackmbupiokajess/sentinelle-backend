@@ -106,6 +106,7 @@ def lister_etablissements() -> dict:
                 "type": {"id": e.type_id, "nom": e.type.nom},
                 **activation(e),
                 "actif": e.actif,
+                "logo": f"/api/etablissements/{e.slug}/logo?v={e.logo_version}" if e.a_logo else None,
                 "cree_le": iso(e.cree_le),
                 "comptes_actifs": e.comptes_actifs,
                 "demandes": e.demandes,

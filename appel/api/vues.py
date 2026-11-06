@@ -67,6 +67,29 @@ def etablissement_public(requete, adresse: str):
     return Response({**services.etablissement_public(etab), "active": bool(etab.active_le)})
 
 
+def image_logo(quelle: str):
+    """Vue Django simple (pas DRF) : renvoie l'image telle quelle, gardée en cache par les navigateurs."""
+
+    def vue(requete, adresse: str):
+        if requete.method not in ("GET", "HEAD"):
+            return HttpResponse(status=405)
+        try:
+            trouvee = services.image_logo(adresse, quelle)
+        except ErreurMetier:
+            trouvee = None
+        if not trouvee:
+            return HttpResponse("Aucun logo.", status=404, content_type="text/plain; charset=utf-8")
+        donnees, type_image = trouvee
+        reponse = HttpResponse(donnees, content_type=type_image)
+        # L'adresse change à chaque nouveau logo (?v=…) : on peut garder l'image un an.
+        reponse["Cache-Control"] = "public, max-age=31536000, immutable"
+        reponse["Cross-Origin-Resource-Policy"] = "cross-origin"  # affichée par le site Vercel
+        reponse["Content-Security-Policy"] = "default-src 'none'; sandbox"
+        return reponse
+
+    return vue
+
+
 @api_view(["POST"])
 def verifier_activation(requete):
     """Page /admin : le responsable colle son code. Valable → adresse de son établissement (code non consommé)."""
@@ -362,6 +385,35 @@ def admin_etablissement(requete):
         return Response(services.etablissement_public(etab))
     d = s.valider(s.NomEtablissement, requete.data)
     return Response(services.renommer_etablissement(etab, d["nom"]))
+
+
+@api_view(["PUT", "DELETE"])
+@permission_classes([EstAdministrateur])
+def admin_logo(requete):
+    """Logo de l'établissement : affiché dans toutes ses pages, ses affiches et son application installée."""
+    etab = _etab(requete)
+    if requete.method == "DELETE":
+        resultat = services.retirer_logo(etab)
+    else:
+        d = s.valider(s.Logo, requete.data)
+        resultat = services.changer_logo(
+            etab, _base64(d["image"]), _base64(d["icone"]), _base64(d["icone_masquable"])
+        )
+    _diffuser(requete)
+    return Response(resultat)
+
+
+def _base64(texte: str) -> bytes:
+    """Accepte « data:image/png;base64,… » ou le base64 seul."""
+    import base64
+    import binascii
+
+    if texte.startswith("data:"):
+        texte = texte.partition(",")[2]
+    try:
+        return base64.b64decode(texte, validate=True)
+    except (binascii.Error, ValueError):
+        raise ErreurMetier("Image illisible.")
 
 
 @api_view(["GET"])

@@ -12,5 +12,5 @@ class EntetesSecurite:
         reponse.setdefault("X-Content-Type-Options", "nosniff")
         reponse.setdefault("Referrer-Policy", "no-referrer")
         if requete.path.startswith("/api/"):
-            reponse["Cache-Control"] = "no-store"
+            reponse.setdefault("Cache-Control", "no-store")  # les logos fixent leur propre cache
         return reponse
