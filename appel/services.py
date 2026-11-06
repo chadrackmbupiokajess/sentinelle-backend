@@ -51,6 +51,7 @@ DUREE_ACTIVATION = timedelta(days=7)
 ADRESSES_RESERVEES = {
     "admin", "plateforme", "infirmier", "c", "chambre", "api", "gestion", "static", "ws",
     "_next", "e", "aide", "connexion", "inscription", "compte", "robots-txt", "favicon-ico",
+    "robotstxt", "faviconico", "icones", "horsligne",
 }
 
 STATUTS_ACTIFS = Alerte.STATUTS_ACTIFS
@@ -187,10 +188,11 @@ def _code_chambre_libre(numero: str) -> str:
 
 
 def _adresse_libre(nom: str, sauf_id: int | None = None) -> str:
-    base = slugify(nom)[:50].strip("-") or "etablissement"
+    """Adresse collée, sans tiret : « Jessna Hôpital » → « jessnahopital » (puis jessnahopital2…)."""
+    base = slugify(nom).replace("-", "")[:50] or "etablissement"
     adresse, n = base, 2
     while adresse in ADRESSES_RESERVEES or Etablissement.objects.filter(slug=adresse).exclude(id=sauf_id).exists():
-        adresse, n = f"{base}-{n}", n + 1
+        adresse, n = f"{base}{n}", n + 1
     return adresse
 
 

@@ -95,19 +95,19 @@ Après toute modification de ces variables : *Deployments* → *Redeploy*.
    - Onglet **Types** : Hôpital, Centre médical, Restaurant sont fournis. Créez-en d'autres (Hôtel…) et
      réglez leur vocabulaire (Chambre/Table, Lit/Place, Patient/Client, Infirmier/Serveur…). Toutes les pages
      de l'établissement l'utilisent.
-   - **Nouvel établissement** : nom + type. Vous obtenez son **adresse** (ex. `/jessna-hopital`) et un
+   - **Nouvel établissement** : nom + type. Vous obtenez son **adresse** (ex. `/jessnahopital`) et un
      **code d'activation** (ex. `K7QM-2XPA`), valable **une seule fois** pendant **7 jours**
      (bouton « Nouveau code » s'il expire).
 2. **Le responsable de l'établissement** ouvre `https://votre-site/admin`, colle le code :
    - code faux, déjà utilisé ou expiré → « Code invalide » ;
    - code valable → la page de son établissement s'ouvre ; il crée son compte administrateur et arrive dans
-     **`/jessna-hopital/admin`**. L'établissement démarre **vide** : il crée lui-même ses chambres et lits
-     (ou tables et places…), puis imprime leurs affiches QR (liens `/jessna-hopital/c/…`).
-3. **Le personnel** ouvre l'adresse de l'établissement (`https://votre-site/jessna-hopital`), clique sur
-   « Demander un compte » ; l'administrateur valide dans `/jessna-hopital/admin` (onglet Comptes).
+     **`/jessnahopital/admin`**. L'établissement démarre **vide** : il crée lui-même ses chambres et lits
+     (ou tables et places…), puis imprime leurs affiches QR (liens `/jessnahopital/c/…`).
+3. **Le personnel** ouvre l'adresse de l'établissement (`https://votre-site/jessnahopital`), clique sur
+   « Demander un compte » ; l'administrateur valide dans `/jessnahopital/admin` (onglet Comptes).
 
-Chaque établissement garde toutes ses pages sous son adresse : `/jessna-hopital` (connexion, tableau de bord),
-`/jessna-hopital/admin` (administration), `/jessna-hopital/c/…` (bornes). Un compte d'un autre établissement
+Chaque établissement garde toutes ses pages sous son adresse : `/jessnahopital` (connexion, tableau de bord),
+`/jessnahopital/admin` (administration), `/jessnahopital/c/…` (bornes). Un compte d'un autre établissement
 n'y a pas accès.
 4. Chaque établissement a ses propres comptes, lieux, appels et messages. Suspendre un établissement dans
    `/plateforme` déconnecte tout son personnel et arrête ses bornes.

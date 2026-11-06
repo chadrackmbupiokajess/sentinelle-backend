@@ -69,15 +69,15 @@ class Base(TestCase):
 class Activation(Base):
     def test_adresse_et_code(self):
         e = self.nouvel_etablissement("Jessna Hôpital")
-        self.assertEqual(e["slug"], "jessna-hopital")
+        self.assertEqual(e["slug"], "jessnahopital")
         self.assertEqual(e["activation"], "en_attente")
         self.assertRegex(e["code_activation"], r"^[A-Z2-9]{4}-[A-Z2-9]{4}$")
-        self.assertEqual(self.nouvel_etablissement("Admin")["slug"], "admin-2")  # adresse réservée évitée
+        self.assertEqual(self.nouvel_etablissement("Admin")["slug"], "admin2")  # adresse réservée évitée
 
     def test_code_valable_une_seule_fois(self):
         e = self.nouvel_etablissement("Jessna Hôpital")
         s, r = self.api("post", "/api/activation/verifier", {"code": e["code_activation"].lower().replace("-", "")})
-        self.assertEqual((s, r["slug"]), (200, "jessna-hopital"))
+        self.assertEqual((s, r["slug"]), (200, "jessnahopital"))
         s, r = self.activer(e["code_activation"], "chadrack")
         self.assertEqual((s, r["compte"]["role"]), (201, "admin"))
         self.assertTrue(r["jeton"])
@@ -306,7 +306,7 @@ class Plateforme(Base):
         admin, adresse = self.etablissement_actif("Clinique A", "alice")
         r = self.api("get", "/api/plateforme/etablissements", jeton=self.proprio)[1]
         e = r["etablissements"][0]
-        self.assertEqual((e["slug"], e["activation"], e["type"]["nom"], e["chambres"]), ("clinique-a", "active", "Hôpital", 0))
+        self.assertEqual((e["slug"], e["activation"], e["type"]["nom"], e["chambres"]), ("cliniquea", "active", "Hôpital", 0))
         self.api("post", f"/api/plateforme/etablissements/{e['id']}", {"actif": False}, self.proprio)
         self.assertEqual(self.api("get", "/api/auth/moi", jeton=admin)[0], 401)
         self.assertEqual(self.api("get", f"/api/etablissements/{adresse}")[0], 404)
