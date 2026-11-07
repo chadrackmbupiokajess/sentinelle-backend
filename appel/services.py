@@ -504,6 +504,15 @@ def abonnements_push_compte(compte_id: int) -> list[dict]:
     return list(AbonnementPush.objects.filter(compte_id=compte_id).values("endpoint", "p256dh", "auth"))
 
 
+def abonnements_push_etablissement(etablissement_id: int) -> list[dict]:
+    """Téléphones abonnés du personnel actif de l'établissement."""
+    return list(
+        AbonnementPush.objects.filter(compte__etablissement_id=etablissement_id, compte__statut="actif").values(
+            "endpoint", "p256dh", "auth", "compte_id"
+        )
+    )
+
+
 def supprimer_abonnement_push(compte_id: int, endpoint: str) -> None:
     AbonnementPush.objects.filter(compte_id=compte_id, endpoint=endpoint).delete()
 

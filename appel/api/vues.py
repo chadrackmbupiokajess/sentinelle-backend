@@ -208,6 +208,7 @@ def accuser_reception(requete, alerte_id: str):
     """Une infirmière accuse réception : l'alarme s'arrête partout."""
     alerte = services.accuser_reception(_etab(requete), alerte_id, requete.user.nom)
     _diffuser(requete)
+    push.envoyer_etablissement(_etab(requete).id, push.fin_appel(alerte_id))
     return Response(alerte)
 
 
@@ -568,8 +569,12 @@ def appeler(requete, jeton: str):
     if not lim_appel_lit.autoriser(sejour.id) or not lim_appel_ip.autoriser(ip(requete)):
         conseil = chambre.etablissement.vocabulaire["conseil_urgence"]
         raise ErreurMetier(f"Trop d'appels en peu de temps. {conseil}", 429)
-    alerte, _ = services.creer_alerte(sejour)
+    alerte, nouvelle = services.creer_alerte(sejour)
     temps_reel.publier(chambre.etablissement_id)
+    if nouvelle:
+        # Téléphones du personnel, même application fermée ou écran éteint.
+        etab = chambre.etablissement
+        push.envoyer_etablissement(etab.id, push.donnees_appel(alerte, etab.slug, etab.vocabulaire))
     return Response(alerte)
 
 
@@ -582,6 +587,7 @@ def annuler(requete, jeton: str):
     v = chambre.etablissement.vocabulaire
     if alerte:
         temps_reel.publier(chambre.etablissement_id)
+        push.envoyer_etablissement(chambre.etablissement_id, push.fin_appel(alerte["id"]))
         temps_reel.aux_soignants(
             chambre.etablissement_id,
             {

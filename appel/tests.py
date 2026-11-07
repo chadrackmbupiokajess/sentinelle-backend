@@ -8,7 +8,7 @@ l'adresse, isolation entre établissements, vocabulaire, temps réel AJAX.
 
 from datetime import timedelta
 
-from django.test import TestCase
+from django.test import override_settings, TestCase
 from rest_framework.test import APIClient
 
 from .models import Compte, Etablissement, Sejour, TypeEtablissement
@@ -251,6 +251,44 @@ class Isolation(Base):
         self.assertEqual(self.api("get", "/api/alertes", jeton=self.zoe)[1], [])
         self.assertEqual(self.api("post", f"/api/alertes/{alerte['id']}/accuser", jeton=self.zoe)[0], 404)
         self.assertEqual(self.api("post", f"/api/alertes/{alerte['id']}/accuser", jeton=self.bob)[1]["accuse_par"], "Bob")
+
+    @override_settings(SENTINELLE_PUSH_ARRIERE_PLAN=False)
+    def test_notification_push_appel_patient(self):
+        """Application fermée : l'appel arrive par notification sur les téléphones de SON établissement."""
+        from unittest import mock
+        from appel import push
+        from appel.models import AbonnementPush
+
+        for compte, n in ((self.bob_id, 1), (Compte.objects.get(identifiant="alice", etablissement__slug=self.a).id, 2),
+                          (Compte.objects.get(identifiant="zoe").id, 3)):
+            AbonnementPush.objects.create(endpoint=f"https://push.exemple/{n}", compte_id=compte, p256dh="p", auth="a")
+        cha = self.ajouter_lieu(self.alice, "101")
+        a101 = f"101-{cha['code']}"
+        sej = self.api("post", "/api/chambres/101/lits/1/admission", {"initiales": "jd"}, self.bob)[1]
+        sejour = {"HTTP_X_SEJOUR": self.api("post", f"/api/bornes/{a101}/activer", {"code": sej["code"]})[1]["jeton_sejour"]}
+        with mock.patch.object(push, "envoyer_abonnement") as envoi:
+            alerte = self.api("post", f"/api/bornes/{a101}/appel", **sejour)[1]
+            self.api("post", f"/api/bornes/{a101}/appel", **sejour)  # même appel : pas de deuxième notification
+        envoyes = [(c.args[0]["endpoint"], c.args[1]) for c in envoi.call_args_list]
+        self.assertEqual(sorted(e for e, _ in envoyes), ["https://push.exemple/1", "https://push.exemple/2"])  # pas l'hôpital B
+        d = envoyes[0][1]
+        self.assertEqual((d["type"], d["tag"], d["url"]), ("appel", f"appel-{alerte['id']}", f"/{self.a}"))
+        self.assertIn("Lit 1", d["titre"])
+        self.assertIn("JD", d["corps"])
+        # Prise en charge : la notification se ferme sur tous les téléphones
+        with mock.patch.object(push, "envoyer_abonnement") as envoi:
+            self.api("post", f"/api/alertes/{alerte['id']}/accuser", jeton=self.bob)
+        self.assertEqual({c.args[1]["type"] for c in envoi.call_args_list}, {"appel_termine"})
+        self.assertEqual(len(envoi.call_args_list), 2)
+        # Annulation par le patient : idem
+        alerte2 = None
+        self.api("post", f"/api/alertes/{alerte['id']}/terminer", jeton=self.bob)
+        with mock.patch.object(push, "envoyer_abonnement") as envoi:
+            alerte2 = self.api("post", f"/api/bornes/{a101}/appel", **sejour)[1]
+            self.api("post", f"/api/bornes/{a101}/annuler", **sejour)
+        types = [c.args[1]["type"] for c in envoi.call_args_list]
+        self.assertEqual(types, ["appel", "appel", "appel_termine", "appel_termine"])
+        self.assertEqual(envoi.call_args_list[-1].args[1]["tag"], f"appel-{alerte2['id']}")
 
     def test_messages(self):
         self.api("post", "/api/messages", {"texte": "privé à A"}, self.alice)
