@@ -37,10 +37,11 @@ def cle_publique() -> str | None:
     return settings.SENTINELLE_VAPID_PUBLIC_KEY if disponible() else None
 
 
-def envoyer_abonnement(abonnement: dict, donnees: dict) -> None:
+def envoyer_abonnement(abonnement: dict, donnees: dict) -> tuple[bool, str]:
+    """Envoie une notification à un téléphone. Renvoie (réussi, explication en cas d'échec)."""
     if not disponible():
         logger.warning("Push indisponible : clés VAPID non configurées.")
-        return
+        return False, "Clés VAPID non configurées sur le serveur."
     from pywebpush import WebPushException, webpush
 
     try:
@@ -53,15 +54,45 @@ def envoyer_abonnement(abonnement: dict, donnees: dict) -> None:
             vapid_private_key=settings.SENTINELLE_VAPID_PRIVATE_KEY,
             vapid_claims={"sub": settings.SENTINELLE_VAPID_SUBJECT},
             ttl=86400 if donnees.get("type") in ("urgence", "urgence_terminee", "appel_termine") else 600,
-            timeout=10,
+            timeout=6,
         )
+        return True, ""
     except WebPushException as exc:
         statut = exc.response.status_code if exc.response is not None else None
-        logger.warning("Échec push vers un abonnement (HTTP %s): %s", statut, exc)
+        detail = (exc.response.text[:200] if exc.response is not None else str(exc)).strip()
+        logger.warning("Échec push vers %s (HTTP %s) : %s", _service(abonnement), statut, detail)
         if statut in (404, 410):
             services.supprimer_abonnement_push(abonnement["compte_id"], abonnement["endpoint"])
+            return False, "Abonnement expiré sur ce téléphone : réactivez la cloche."
+        return False, f"Refusé par {_service(abonnement)} (HTTP {statut}) : {detail}"
     except Exception as exc:  # réseau bloqué (compte gratuit PythonAnywhere…)
-        logger.warning("Échec push : %s", exc)
+        logger.warning("Échec push vers %s : %s", _service(abonnement), exc)
+        return False, f"Serveur de notifications injoignable ({_service(abonnement)}) : {exc}"
+
+
+def _service(abonnement: dict) -> str:
+    """Nom du serveur de notifications du téléphone (Google, Apple, Mozilla…), pour les messages."""
+    from urllib.parse import urlparse
+
+    return urlparse(abonnement["endpoint"]).hostname or "?"
+
+
+def tester_compte(compte_id: int, vocabulaire: dict) -> dict:
+    """Bouton « Tester » : notification d'essai, envoyée tout de suite, avec le résultat par téléphone."""
+    abonnements = services.abonnements_push_compte(compte_id)
+    resultats = []
+    for abonnement in abonnements:
+        reussi, detail = envoyer_abonnement(
+            {**abonnement, "compte_id": compte_id},
+            {
+                "type": "test",
+                "tag": "jessna-test",
+                "titre": "🔔 Notification d'essai",
+                "corps": f"Les appels arriveront ainsi, même application fermée. ({vocabulaire['personnel']} prévenu(e).)",
+            },
+        )
+        resultats.append({"service": _service(abonnement), "ok": reussi, "erreur": detail or None})
+    return {"abonnements": len(abonnements), "envoyes": sum(r["ok"] for r in resultats), "resultats": resultats}
 
 
 def envoyer_compte(compte_id: int, donnees: dict) -> None:
@@ -70,8 +101,10 @@ def envoyer_compte(compte_id: int, donnees: dict) -> None:
 
 
 def envoyer_etablissement(etablissement_id: int, donnees: dict) -> None:
-    """Tout le personnel actif de l'établissement (téléphones abonnés), sans faire attendre la borne :
-    l'envoi part dans un fil d'exécution à part (chaque téléphone peut prendre une fraction de seconde)."""
+    """Tout le personnel actif de l'établissement (téléphones abonnés).
+    Envoi direct par défaut : PythonAnywhere désactive les fils d'exécution des applications web
+    (un fil n'y démarrerait jamais, sans aucune erreur). Sur le VPS, SENTINELLE_PUSH_ARRIERE_PLAN=1
+    envoie en arrière-plan pour que la borne n'attende pas."""
     if not disponible():
         return
     abonnements = services.abonnements_push_etablissement(etablissement_id)
@@ -82,7 +115,7 @@ def envoyer_etablissement(etablissement_id: int, donnees: dict) -> None:
         for abonnement in abonnements:
             envoyer_abonnement(abonnement, donnees)
 
-    if not getattr(settings, "SENTINELLE_PUSH_ARRIERE_PLAN", True):
+    if not getattr(settings, "SENTINELLE_PUSH_ARRIERE_PLAN", False):
         envoyer()
         return
 

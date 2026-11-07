@@ -20,6 +20,7 @@ urlpatterns = [
     path("auth/deconnexion", v.deconnexion),
     path("auth/mot-de-passe", v.changer_mot_de_passe),
     path("push/abonnement", v.abonnement_push),
+    path("push/test", v.tester_push),
     # Appels
     path("alertes", v.lister_alertes),
     path("alertes/<str:alerte_id>/accuser", v.accuser_reception),

@@ -193,6 +193,18 @@ def abonnement_push(requete):
     return Response({"ok": True}, status=201)
 
 
+@api_view(["POST"])
+@permission_classes([EstSoignant])
+def tester_push(requete):
+    """Notification d'essai sur les téléphones de ce compte, avec le résultat (diagnostic)."""
+    if not push.disponible():
+        raise ErreurMetier("Les notifications push ne sont pas configurées sur le serveur (clés VAPID).", 503)
+    resultat = push.tester_compte(requete.user.id, requete.user.etablissement.vocabulaire)
+    if not resultat["abonnements"]:
+        raise ErreurMetier("Aucun téléphone abonné pour ce compte : activez d'abord la cloche.", 404)
+    return Response(resultat)
+
+
 # ==========================================================================
 # Soignants : appels
 # ==========================================================================

@@ -290,6 +290,45 @@ class Isolation(Base):
         self.assertEqual(types, ["appel", "appel", "appel_termine", "appel_termine"])
         self.assertEqual(envoi.call_args_list[-1].args[1]["tag"], f"appel-{alerte2['id']}")
 
+    def test_bouton_tester_les_notifications(self):
+        """Vraie notification chiffrée (pywebpush) vers un faux serveur de notifications local."""
+        import base64, http.server, json as j, os, threading as th
+        from unittest import mock
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from appel.models import AbonnementPush
+
+        recues, reponses = [], {"/ok": 201, "/expire": 410, "/refuse": 403}
+
+        class Faux(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                corps = self.rfile.read(int(self.headers["Content-Length"]))
+                recues.append((self.path, self.headers.get("Content-Encoding"), self.headers.get("Authorization", "")[:6], len(corps)))
+                self.send_response(reponses[self.path]); self.end_headers(); self.wfile.write(b"motif")
+
+            def log_message(self, *a):
+                pass
+
+        serveur = http.server.HTTPServer(("127.0.0.1", 0), Faux)
+        th.Thread(target=serveur.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{serveur.server_port}"
+        cle = ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(
+            serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+        b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+        s, r = self.api("post", "/api/push/test", jeton=self.bob)
+        self.assertEqual(s, 404, r)  # pas encore de cloche activée
+        for chemin in ("/ok", "/expire", "/refuse"):
+            AbonnementPush.objects.create(endpoint=base + chemin, compte_id=self.bob_id, p256dh=b64(cle), auth=b64(os.urandom(16)))
+        with mock.patch.dict(os.environ, {"NO_PROXY": "127.0.0.1", "no_proxy": "127.0.0.1"}):
+            s, r = self.api("post", "/api/push/test", jeton=self.bob)
+        serveur.shutdown()
+        self.assertEqual((s, r["abonnements"], r["envoyes"]), (200, 3, 1), r)
+        self.assertEqual(sorted(x[0] for x in recues), ["/expire", "/ok", "/refuse"])
+        self.assertTrue(all(x[1] == "aes128gcm" and x[2] == "vapid " and x[3] > 100 for x in recues), recues)  # chiffré + signé
+        erreurs = {x["ok"]: x["erreur"] for x in r["resultats"]}
+        self.assertIn("HTTP 403", [x["erreur"] for x in r["resultats"] if x["erreur"] and "403" in x["erreur"]][0])
+        self.assertFalse(AbonnementPush.objects.filter(endpoint=base + "/expire").exists())  # abonnement expiré retiré
+
     def test_messages(self):
         self.api("post", "/api/messages", {"texte": "privé à A"}, self.alice)
         self.assertEqual(self.api("get", "/api/messages", jeton=self.zoe)[1], [])

@@ -55,9 +55,13 @@ REGLAGES = {
     # Notifications push (clés VAPID, générées pour Sentinelle).
     "SENTINELLE_VAPID_PUBLIC_KEY": "BCYEeHOZbpwGDZf022weipYC_j4XI1YLLxMqFsMERLot4KhF69226aIFUMsl-8Z5qQv_hIT9fr8jjVeqso5xIYc",
     "SENTINELLE_VAPID_PRIVATE_KEY": "lEIUTgzZCkr2ETMEvCU_M7rxMEkSljhtzVbAOqbBh7s",
-    # Contact exigé par les services de notification : mettez votre adresse e-mail.
-    "SENTINELLE_VAPID_SUBJECT": "mailto:vous@exemple.com",
+    # Contact exigé par les services de notification (Google, Apple) : l'adresse du site,
+    # ou « mailto:votre@adresse » si vous préférez être contacté par e-mail.
+    "SENTINELLE_VAPID_SUBJECT": "https://jessna.vercel.app",
     # --- VPS uniquement -------------------------------------------------------
+    # Envoi des notifications en arrière-plan (fil d'exécution) : "1" sur le VPS seulement.
+    # PythonAnywhere désactive les fils d'exécution des applications web : l'envoi y reste direct.
+    "SENTINELLE_PUSH_ARRIERE_PLAN": "0",
     # WebSockets (Django Channels, serveur uvicorn) : "1" sur le VPS.
     "SENTINELLE_WEBSOCKET": "0",
     # Plusieurs processus uvicorn : Redis obligatoire, ex. "redis://localhost:6379/0".
@@ -224,6 +228,7 @@ SENTINELLE_PRESENCE_S = int(env("SENTINELLE_PRESENCE_S", "90"))
 SENTINELLE_VAPID_PUBLIC_KEY = env("SENTINELLE_VAPID_PUBLIC_KEY")
 SENTINELLE_VAPID_PRIVATE_KEY = env("SENTINELLE_VAPID_PRIVATE_KEY")
 SENTINELLE_VAPID_SUBJECT = env("SENTINELLE_VAPID_SUBJECT")
+SENTINELLE_PUSH_ARRIERE_PLAN = env_bool("SENTINELLE_PUSH_ARRIERE_PLAN")
 
 # WebSockets (Django Channels) : uniquement sur un serveur ASGI (VPS), pas sur PythonAnywhere.
 SENTINELLE_WEBSOCKET = env_bool("SENTINELLE_WEBSOCKET")
